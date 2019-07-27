@@ -1,0 +1,11 @@
+Changes to the eng_us table
+
+IPA	original	proposed
+	
+æ	ae	E
+ʌ	^	A
+θ	th	T
+ð	TH	D
+ʃ	sh	S
+ʒ	zh	Z
+
