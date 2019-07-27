@@ -20,7 +20,7 @@ A report in tabular format listing duration for each labelled interval in the in
 
 Upon running the script, a window like the one below will appear, where the user has to set a number of parameters.
 
-![Script GUI](figs/script-gui.png)
+![Script GUI](figs/script_gui.png)
 
 The parameters are:
 
