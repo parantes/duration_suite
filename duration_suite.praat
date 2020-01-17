@@ -23,7 +23,7 @@
 # Comments:
 # Script file and user files don't need to be in the same file directory.
 #
-# Copyright (C) 2008-2019  Pablo Arantes
+# Copyright (C) 2008-2020  Pablo Arantes
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -51,8 +51,9 @@ form duration_suite
 	optionmenu Language: 1
  		button por_br_sampa
  		button por_br_ortofon
- 		button eng_us
- 		button spa
+ 		## TODO
+ 		# button eng_us
+ 		# button spa
 	comment Choice of smoothing method
 	optionmenu Smoothing_method: 1
 		button 5-point Moving Average
@@ -74,14 +75,12 @@ do_bd = stress_group_boundary
 # Read reference values table
 if language = 1
 	ref = Read Table from tab-separated file: "por_br_sampa.txt"
-include parse_por_br_sampa.praat
 elsif language = 2
 	ref = Read Table from tab-separated file: "por_br_ortofon.txt"
-include parse_por_br_ortofon.praat
-elsif language = 3
-	ref = Read Table from tab-separated file: "eng_us.txt"
-else
-	ref = Read Table from tab-separated file: "spa.txt"
+# elsif language = 3
+# 	ref = Read Table from tab-separated file: "eng_us.txt"
+# else
+#	ref = Read Table from tab-separated file: "spa.txt"
 endif
 
 if mode = 1
@@ -146,29 +145,34 @@ for file to files
 		Set numeric value: unit, "position", unit
 	endfor
 
-	# Normalize raw duration if option was selected
+	# Normalize raw duration if that option was selected
 	if do_z
 		selectObject: tab
 		Append column: "norm"
 
 		for unit to units
 			label$ = object$[tab, unit, "label"]
-			@parse: label$
+			if language = 1
+				@parse_por_br_sampa: label$
+			else
+				@parse_por_br_ortofon: label$
+			endif
 
-			if parse.errors > 0
+
+			if parse_errors > 0
 				writeInfoLine: "Invalid character(s) in file ", file$, ", position ", unit, "."
 				appendInfoLine: "Label: ", label$
-				appendInfoLine: "Errors: ", parse.errors
-				for i to parse.errors
-					appendInfoLine: parse.errors$[i]
+				appendInfoLine: "Errors: ", parse_errors
+				for i to parse_errors
+					appendInfoLine: parse_errors$[i]
 				endfor
 				exitScript: "Invalid character in file ", file$, ". See Info window."
 			endif
 	
 			sum_means = 0
 			sum_vars = 0
-			for j to parse.nseg
-				seg$ = parse.segments$[j]
+			for j to parse_nseg
+				seg$ = parse_segments$[j]
 				selectObject: ref
 				row = Search column: "phone", seg$
 				mean = object[ref, row, "mean"]
@@ -188,7 +192,7 @@ for file to files
 		selectObject: tab
 		Append column: "smooth"
 		if smoothing_method = 1
-			@five_point: alpha, tab, "norm", "smooth"
+			@five_point: tab, "norm", "smooth"
 		else
 			@exponential: alpha, tab, "norm", "smooth"
 		endif
@@ -379,4 +383,228 @@ procedure boundaries: .tab, .in_col$, .out_col$
 		endif
 		Set numeric value: .row, .out_col$, .bd
 	endfor
+endproc
+
+procedure parse_por_br_sampa: .label$
+# Parse Brazilian Portuguese segmentation (SAMPA style)
+#
+# = Input parameters =
+# .label$: string of characters to be parsed
+#
+# = Output variables = 
+# .segments$: array holding parsed segments
+# .nseg: segments$ array size
+# .errors$: array holding illegal characters in label
+# .errors: errors$ array size
+#
+# = How it works =
+# The procedure will parse a phonetic label comprised of a string of
+# at least one ASCII character into phonetic segments. Phonetic segments
+# can be represented by one character or a combination of two or three
+# characters, listed below.
+# 
+# = Observartions =
+# All relevant variables are internal to the procedure, except for two
+# numerical variables (number of parse errors and segments in .label$)
+# and two string arrays (string errors and valid segments) that are global.
+# 
+# * 3-letter segments
+# [ao]Nj
+# [aA]Nw
+#
+# * 2-letter segments
+# [aeouEIOU]j
+# [aeioEOU]w
+# [IU][@&]
+# [aeiouAIU&@]N
+#
+# Parsing of the string consists of the following steps:
+#
+# 1. Start from the beginning of string.
+# 2. Test for presence of a segment represented by a 3-letter combination.
+# 3. If true, set end of segment to index 3.
+# 4. If false, test for the presence of a segment represented by a 2-letter
+#    combination.
+# 5. If true, set end of segment to index 2.
+# 6. If false, segment is represent by a single character.
+# 7. Test if character is an element of one-character Sampa-PB symbol set.
+# 8. If false, save invalid character in string variable that can be used
+#    in an error message to the user.
+#
+# = Output =
+# Parsed segments and illegal segments are stored as array elements.
+#
+
+	## Regular expressions used to search for 2- or 3-letter combination
+	## at the beginning of a string
+	# 3-letter combinations
+	.three$ = "^([ao]Nj|[aA]Nw)"
+	# 2-letter combinations
+	.two$ = "^([aeouEIOU]j|[aeioEOU]w|[IU][@&6]|[aeiouAIU&@]N)"
+	# 1-letter symbols
+	.one$ = "^[ptkbdgfsSvzZ54mnJrXlLRDTaeiouEOAIU&@6]{1}"
+
+	# Error counter
+	parse_errors = 0
+
+	# Number of Sampa-PB segments in label$ string
+	parse_nseg = 0
+
+	# Initial label$ size
+	.len = length(.label$)
+
+	while .len > 0
+
+		# Define the size of the current chunk to be analyzed
+		.three = index_regex(.label$, .three$)
+		.two = index_regex(.label$, .two$)
+		.one = index_regex(.label$, .one$)
+
+		if .three = 1
+			.end = 3
+		elsif .two = 1
+			.end = 2
+		else
+			# Either we have a legal one-character segment
+			# or an illegal character
+			.end = 1
+		endif
+
+		# Extract the current parsed string 
+		.current$ = left$(.label$, .end)
+
+		# If no valid sequences are found,
+		# First character in label$ is illegal
+		.is_legal = .three + .two + .one
+
+		if .is_legal <> 0
+			parse_nseg += 1
+			parse_segments$[parse_nseg] = .current$
+		else
+			parse_errors += 1
+			parse_errors$[parse_errors] = .current$
+		endif
+
+		# Remove current parsed chunk from label$
+		.label$ = replace$(.label$, .current$, "", 1)
+		.len = length(.label$)
+	endwhile
+endproc
+
+procedure parse_por_br_ortofon: .label$
+# Parse Brazilian Portuguese segmentation (Ortofon style)
+#
+# = Input parameters =
+# .label$: string of characters to be parsed
+#
+# = Output variables = 
+# .segments$: array holding parsed segments
+# .nseg: segments$ array size
+# .errors$: array holding illegal characters in label
+# .errors: errors$ array size
+#
+# = How it works =
+# The procedure will parse a phonetic label comprised of a string of
+# at least one ASCII character into phonetic segments. Phonetic segments
+# can be represented by one character or a combination of two or three
+# characters, listed below.
+# 
+# = Observartions =
+# All relevant variables are internal to the procedure, except for two
+# numerical variables (number of parse errors and segments in .label$)
+# and two string arrays (string errors and valid segments) that are global.
+#
+# * 3-letter segments
+# [eo]h[IU]
+# [aA]NU
+# [ao]NI
+#
+# * 2-letter segments
+# [aAeEiIoOuU]N
+# [eolnsz]h
+# [IU][AEO]
+# [aeIouU]I
+# [aeiIoU]U
+#
+# * 1-letter segments
+# [aAbdeEfgiIklmnoOprRsStuUvz]
+#
+# Parsing of the string consists of the following steps:
+#
+# 1. Start from the end of the string to be parsed
+# 2. Test for presence of a segment represented by a 3-letter combination
+# 3. If true, set the start of the segment to index length - 3
+# 4. If false, test for the presence s segment represented by a 2-letter combination
+# 5. If true, set end of segment to index length - 2
+# 6. If false, segment is represent by a single character
+# 7. Test if character is an element of one-character Ortofon symbol set 
+# 8. If false, save invalid character in string variable that can be used
+#    in an error message to the user.
+#
+# = Output =
+# Parsed segments and illegal segments are stored as array elements.
+#
+
+	## Regular expressions used to search a 2- or 3-letter combination
+	## at the beginning of the string
+	# 3-letter combinations
+	.three$ = "([eo]h[IU]|[aA]NU|[ao]NI)$"
+	# 2-letter combinations
+	.two_N_h$ = "([aAeEiIoOuU]N|[eolnsz]h)$"
+	.two_V$ = "([aeIouU]I|[aeiIoU]U|[IU][AEO])$"
+	# 1-letter symbols
+	.one$ = "[aAbdeEfgiIklmnoOprRsStuUvz]{1}$"
+
+	# Error counter
+	parse_errors = 0
+
+	# Number of Ortofon segments in label$ string
+	parse_nseg = 0
+
+	# Initial label$ size
+	.len = length(.label$)
+
+	while .len > 0
+
+		# Define the size of the current chunk to be analyzed
+		.three = index_regex(.label$, .three$)
+		.two_N_h = index_regex(.label$, .two_N_h$)
+		.two_V = index_regex(.label$, .two_V$)
+		.one = index_regex(.label$, .one$)
+
+		if .three <> 0
+			#.start = .len - 3
+			.parsed = 3
+		elsif .two_N_h <> 0
+			#.start = .len - 2
+			.parsed = 2
+		elsif .two_V <> 0
+			#.start = .len - 2
+			.parsed = 2
+		else
+			# Either we have a legal one-character segment
+			# or an illegal character
+			#.start = .len - 1
+			.parsed = 1
+		endif
+
+		# Extract the current parsed string 
+		.current$ = right$(.label$, .parsed)
+
+		# If no valid sequences are found,
+		# the parsed character in label$ is illegal
+		.is_legal = .three + .two_N_h + .two_V + .one
+
+		if .is_legal <> 0
+			parse_nseg += 1
+			parse_segments$[parse_nseg] = .current$
+		else
+			parse_errors += 1
+			parse_errors$[parse_errors] = .current$
+		endif
+
+		# Remove current parsed chunk from label$
+		.label$ = .label$ - .current$
+		.len = length(.label$)
+	endwhile
 endproc
