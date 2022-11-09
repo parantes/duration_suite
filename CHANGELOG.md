@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.1] - 2022-11-09
+### Added
+- Implemented English and Spanish as options for duration normalization.
+
 ## [0.1.4] - 2020-01-17
 ### Fixed
 - Fixed a bug related to 'include' statements within 'if' statements; included code were

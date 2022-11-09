@@ -15,7 +15,7 @@
 #
 # Input:
 # Previously segmented TextGrid files.
-# 
+#
 # Output:
 # A report in tabular format listing duration for each labelled interval in
 # the input TextGrid files.
@@ -23,7 +23,7 @@
 # Comments:
 # Script file and user files don't need to be in the same file directory.
 #
-# Copyright (C) 2008-2020  Pablo Arantes
+# Copyright (C) 2008-2022  Pablo Arantes
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -49,11 +49,10 @@ form duration_suite
 	comment Tier from which duration should be extracted:
 	integer Tier 2
 	optionmenu Language: 1
- 		button por_br_sampa
- 		button por_br_ortofon
- 		## TODO
- 		# button eng_us
- 		# button spa
+		button por_br_sampa
+		button por_br_ortofon
+		button eng_us
+		button spa
 	comment Choice of smoothing method
 	optionmenu Smoothing_method: 1
 		button 5-point Moving Average
@@ -77,10 +76,10 @@ if language = 1
 	ref = Read Table from tab-separated file: "por_br_sampa.txt"
 elsif language = 2
 	ref = Read Table from tab-separated file: "por_br_ortofon.txt"
-# elsif language = 3
-# 	ref = Read Table from tab-separated file: "eng_us.txt"
-# else
-#	ref = Read Table from tab-separated file: "spa.txt"
+elsif language = 3
+	ref = Read Table from tab-separated file: "eng_us.txt"
+else
+	ref = Read Table from tab-separated file: "spa.txt"
 endif
 
 if mode = 1
@@ -122,7 +121,7 @@ for file to files
 	units = Get number of rows
 
 	# Consider only tiers with at least one non-empty intervals
-    if units = 0
+	if units = 0
 		exitScript: "Tier ", tier, " in TextGrid ", file$, " has no filled intervals."
 	endif
 
@@ -154,10 +153,13 @@ for file to files
 			label$ = object$[tab, unit, "label"]
 			if language = 1
 				@parse_por_br_sampa: label$
-			else
+			elsif language = 2
 				@parse_por_br_ortofon: label$
+			elsif language = 3
+				@parse_eng: label$
+			else
+				@parse_spa: label$
 			endif
-
 
 			if parse_errors > 0
 				writeInfoLine: "Invalid character(s) in file ", file$, ", position ", unit, "."
@@ -168,7 +170,7 @@ for file to files
 				endfor
 				exitScript: "Invalid character in file ", file$, ". See Info window."
 			endif
-	
+
 			sum_means = 0
 			sum_vars = 0
 			for j to parse_nseg
@@ -220,7 +222,7 @@ for file to files
 	endif
 
 	# Clean up objects
-	removeObject: grid, sel 
+	removeObject: grid, sel
 endfor
 
 selectObject: tab[1]
@@ -265,7 +267,7 @@ procedure five_point: .tab, .col$, .sm_col$
 # 1. the 1st position has no previous data points
 # 2. the last position has no following data points
 # 3. the 2nd position has only one previous data point
-# 4. the 2nd to last position has only one following data point 
+# 4. the 2nd to last position has only one following data point
 #
 # In cases 1 and 2 we do a 2-point weighted average. In cases
 # 3 and 4 we do a 3-point weighted average.
@@ -308,7 +310,7 @@ procedure exponential: .alpha, .tab, .in_col$, .out_col$
 # = Description =
 # Applies exponential smoothing to normalized (z-scored) duration points.
 # The general function takes the current normalized duration value (t_i)
-# and the previous value of the smoothed series (sm_i-1) following the 
+# and the previous value of the smoothed series (sm_i-1) following the
 # formula sm_i = alpha * t_i + ((1 - alpha) * sm_i-1).
 #
 # There is one special case: at the first position there are no previous
@@ -344,13 +346,13 @@ procedure boundaries: .tab, .in_col$, .out_col$
 # = Description =
 # Finds maxima in a series of smoothed duration values.
 # A maximum is a relation that a data point (t_i) has with its imediate
-# neighbours t_i-1 and t_i+1. A maximum defines a boundary (bd = 1) 
+# neighbours t_i-1 and t_i+1. A maximum defines a boundary (bd = 1)
 # according to the rule:
 # bd = 1 if t_i-1 <= t_i > t_i+1 and bd = 0 otherwise.
 #
 # Two special cases are the first and last data points in the series.
 # For the firt case, t_1 is a maximum if it is greater than t_2.
-# For the second case, t_n is a maximum if it is equal or greater than t_n-1. 
+# For the second case, t_n is a maximum if it is equal or greater than t_n-1.
 
 	selectObject: .tab
 	.rows = object[.tab].nrow
@@ -391,7 +393,7 @@ procedure parse_por_br_sampa: .label$
 # = Input parameters =
 # .label$: string of characters to be parsed
 #
-# = Output variables = 
+# = Output variables =
 # .segments$: array holding parsed segments
 # .nseg: segments$ array size
 # .errors$: array holding illegal characters in label
@@ -402,12 +404,12 @@ procedure parse_por_br_sampa: .label$
 # at least one ASCII character into phonetic segments. Phonetic segments
 # can be represented by one character or a combination of two or three
 # characters, listed below.
-# 
+#s
 # = Observartions =
 # All relevant variables are internal to the procedure, except for two
 # numerical variables (number of parse errors and segments in .label$)
 # and two string arrays (string errors and valid segments) that are global.
-# 
+#
 # * 3-letter segments
 # [ao]Nj
 # [aA]Nw
@@ -470,7 +472,7 @@ procedure parse_por_br_sampa: .label$
 			.end = 1
 		endif
 
-		# Extract the current parsed string 
+		# Extract the current parsed string
 		.current$ = left$(.label$, .end)
 
 		# If no valid sequences are found,
@@ -497,7 +499,7 @@ procedure parse_por_br_ortofon: .label$
 # = Input parameters =
 # .label$: string of characters to be parsed
 #
-# = Output variables = 
+# = Output variables =
 # .segments$: array holding parsed segments
 # .nseg: segments$ array size
 # .errors$: array holding illegal characters in label
@@ -508,7 +510,7 @@ procedure parse_por_br_ortofon: .label$
 # at least one ASCII character into phonetic segments. Phonetic segments
 # can be represented by one character or a combination of two or three
 # characters, listed below.
-# 
+#
 # = Observartions =
 # All relevant variables are internal to the procedure, except for two
 # numerical variables (number of parse errors and segments in .label$)
@@ -537,7 +539,7 @@ procedure parse_por_br_ortofon: .label$
 # 4. If false, test for the presence s segment represented by a 2-letter combination
 # 5. If true, set end of segment to index length - 2
 # 6. If false, segment is represent by a single character
-# 7. Test if character is an element of one-character Ortofon symbol set 
+# 7. Test if character is an element of one-character Ortofon symbol set
 # 8. If false, save invalid character in string variable that can be used
 #    in an error message to the user.
 #
@@ -588,7 +590,7 @@ procedure parse_por_br_ortofon: .label$
 			.parsed = 1
 		endif
 
-		# Extract the current parsed string 
+		# Extract the current parsed string
 		.current$ = right$(.label$, .parsed)
 
 		# If no valid sequences are found,
@@ -605,6 +607,177 @@ procedure parse_por_br_ortofon: .label$
 
 		# Remove current parsed chunk from label$
 		.label$ = .label$ - .current$
+		.len = length(.label$)
+	endwhile
+endproc
+
+procedure parse_eng: .label$
+# Parse English segmentation
+#
+# = Input parameters =
+# .label$: string of characters to be parsed
+#
+# = Output variables =
+# .segments$: array holding parsed segments
+# .nseg: segments$ array size
+# .errors$: array holding illegal characters in label
+# .errors: errors$ array size
+#
+# = How it works =
+# The procedure parses a phonetic label comprised of a string of
+# at least one ASCII character into phonetic segments. Phonetic segments
+# can be represented by one character or a combination of two characters,
+# listed below.
+#
+# = Observartions =
+# All relevant variables are internal to the procedure, except for two
+# numerical variables (number of parse errors and segments in .label$)
+# and two string arrays (string errors and valid segments) that are global.
+#
+#
+# * 2-letter segments
+# [aeEiou]R
+# [aeo]I
+# [ao]U
+# [aiou]:
+# tS
+# dZ
+#
+# Parsing of the string consists of the following steps:
+#
+# 1. Start from the beginning of string.
+# 2. Test for presence of a segment represented by a 2-letter combination.
+# 3. If true, set end of segment to index 2.
+# 4. If false, segment is represent by a single character.
+# 5. Test if character is a valid one-character element of English symbol set.
+# 6. If false, save invalid character in string variable that can be used
+#    in an error message to the user.
+#
+# = Output =
+# Parsed segments and illegal segments are stored as array elements.
+#
+
+	## Regular expressions used to search for 2- and 1-letter combinations
+	## at the beginning of a string
+	# 2-letter combinations
+	.two$ = "^([aeEiou]R|[aeo]I|[ao]U|[aiou]:|tS|dZ)"
+	# 1-letter symbols
+	.one$ = "^[aAE@eiouTDrSZbdfghjklmnNpstvwz]{1}"
+
+	# Error counter
+	parse_errors = 0
+
+	# Number of segments in label$ string
+	parse_nseg = 0
+
+	# Initial label$ size
+	.len = length(.label$)
+
+	while .len > 0
+		# Define the size of the current chunk to be analyzed
+		.two = index_regex(.label$, .two$)
+		.one = index_regex(.label$, .one$)
+
+		if .two = 1
+			.end = 2
+		else
+			# Either we have a legal one-character segment
+			# or an illegal character
+			.end = 1
+		endif
+
+		# Extract the current parsed string
+		.current$ = left$(.label$, .end)
+
+		# If no valid sequences are found,
+		# First character in label$ is illegal
+		.is_legal = .two + .one
+
+		if .is_legal <> 0
+			parse_nseg += 1
+			parse_segments$[parse_nseg] = .current$
+		else
+			parse_errors += 1
+			parse_errors$[parse_errors] = .current$
+		endif
+
+		# Remove current parsed chunk from label$
+		.label$ = replace$(.label$, .current$, "", 1)
+		.len = length(.label$)
+	endwhile
+endproc
+
+procedure parse_spa: .label$
+# Parse Spanish segmentation
+#
+# = Input parameters =
+# .label$: string of characters to be parsed
+#
+# = Output variables =
+# .segments$: array holding parsed segments
+# .nseg: segments$ array size
+# .errors$: array holding illegal characters in label
+# .errors: errors$ array size
+#
+# = How it works =
+# The procedure parses a phonetic label comprised of a string of
+# at least one ASCII character into phonetic segments. Phonetic segments
+# can be represented by one character or a combination of two characters,
+# listed below.
+#
+# = Observartions =
+# All relevant variables are internal to the procedure, except for two
+# numerical variables (number of parse errors and segments in .label$)
+# and two string arrays (string errors and valid segments) that are global.
+#
+# All elements in the Spanish symbol set are one-character in length.
+#
+# Parsing of the string consists of the following steps:
+#
+# 1. Start from the beginning of string.
+# 2. Test if character is a valid one-character element of English symbol set.
+# 3. If false, save invalid character in string variable that can be used
+#    in an error message to the user.
+#
+# = Output =
+# Parsed segments and illegal segments are stored as array elements.
+#
+
+	## Regular expressions used to search for 1-letter symbols 
+	# 1-letter symbols
+	.one$ = "^[BCDGJLNRTabdefgijklmnopqrstuwxz]{1}"
+
+	# Error counter
+	parse_errors = 0
+
+	# Number of segments in label$ string
+	parse_nseg = 0
+
+	# Initial label$ size
+	.len = length(.label$)
+
+	while .len > 0
+		# Define the size of the current chunk to be analyzed
+		.one = index_regex(.label$, .one$)
+		.end = 1
+
+		# Extract the current parsed string
+		.current$ = left$(.label$, .end)
+
+		# If no valid sequences are found,
+		# First character in label$ is illegal
+		.is_legal = .one
+
+		if .is_legal <> 0
+			parse_nseg += 1
+			parse_segments$[parse_nseg] = .current$
+		else
+			parse_errors += 1
+			parse_errors$[parse_errors] = .current$
+		endif
+
+		# Remove current parsed chunk from label$
+		.label$ = replace$(.label$, .current$, "", 1)
 		.len = length(.label$)
 	endwhile
 endproc
